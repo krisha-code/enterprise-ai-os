@@ -3,16 +3,14 @@ from statistics import mean
 
 from app.database.session import AsyncSessionLocal
 from app.models.document_chunk import DocumentChunk
-from app.services.hybrid_search_service import HybridSearchService
-from app.services.reranker_service import RerankerService
-from app.services.evidence_sufficiency_service import (
-    EvidenceSufficiencyService,
-)
+from app.services.document_search_service import DocumentSearchService
+from app.services.evidence_sufficiency_service import EvidenceSufficiencyService
 
 
 USER_ID = 1
-RETRIEVAL_LIMIT = 20
 
+# Match the production search call: retrieve and rank up to 20 results.
+RETRIEVAL_LIMIT = 20
 
 RAG_EVALUATION_QUESTIONS = [
     {
@@ -112,22 +110,16 @@ RAG_EVALUATION_QUESTIONS = [
 
 
 def calculate_rank_features(
-    reranked_results: list[tuple[DocumentChunk, float]],
+    ranked_results: list[tuple[DocumentChunk, float]],
     expected_sections: list[str],
 ) -> dict:
     """
-    Calculate diagnostic features from reranked results.
+    Calculate evaluation diagnostics for the returned ranking.
 
-    IMPORTANT:
-
-    Production evidence decisions must NOT use
-    expected_sections or any other ground-truth information.
-
-    expected_sections is used only by the evaluation harness
-    to measure whether known relevant sections were retrieved.
+    Expected section names are used only to measure retrieval completeness.
+    They are never passed into the evidence-sufficiency decision.
     """
-
-    if not reranked_results:
+    if not ranked_results:
         return {
             "best_score": None,
             "second_score": None,
@@ -139,146 +131,109 @@ def calculate_rank_features(
             "average_top_3": None,
             "average_top_5": None,
             "matching_top_5_count": 0,
+            "matched_expected_section_count": 0,
             "unique_section_count": 0,
             "dominant_section_count": 0,
             "first_relevant_rank": None,
         }
 
-    scores = [
-        float(score)
-        for _, score in reranked_results
-    ]
+    # Results are ordered by the production cross-encoder reranker.
+    # Compute score statistics from the returned top-five results.
+    top_5_results = ranked_results[:5]
+    top_5_scores = [float(score) for _, score in top_5_results]
+    top_3_scores = top_5_scores[:3]
+    sorted_top_5_scores = sorted(top_5_scores, reverse=True)
 
-    best_score = scores[0]
-
+    best_score = sorted_top_5_scores[0]
     second_score = (
-        scores[1]
-        if len(scores) > 1
+        sorted_top_5_scores[1]
+        if len(sorted_top_5_scores) > 1
         else None
     )
-
     third_score = (
-        scores[2]
-        if len(scores) > 2
+        sorted_top_5_scores[2]
+        if len(sorted_top_5_scores) > 2
         else None
     )
-
     score_gap = (
         best_score - second_score
         if second_score is not None
         else None
     )
 
-    count_ge_2 = sum(
-        1
-        for score in scores
-        if score >= 2.0
-    )
-
-    count_ge_4 = sum(
-        1
-        for score in scores
-        if score >= 4.0
-    )
-
-    count_ge_6 = sum(
-        1
-        for score in scores
-        if score >= 6.0
-    )
-
-    top_3_scores = scores[:3]
-
-    top_5_scores = scores[:5]
-
-    average_top_3 = (
-        mean(top_3_scores)
-        if top_3_scores
-        else None
-    )
-
-    average_top_5 = (
-        mean(top_5_scores)
-        if top_5_scores
-        else None
-    )
-
-    # ---------------------------------------------------------
-    # Evaluation-only ground-truth diagnostic
-    # ---------------------------------------------------------
+    normalized_expected = [
+        section.strip().casefold()
+        for section in expected_sections
+        if section.strip()
+    ]
 
     matching_top_5_count = 0
+    matched_expected_sections = set()
     first_relevant_rank = None
 
-    for rank, (chunk, _) in enumerate(
-        reranked_results[:5],
-        start=1,
-    ):
-        if (
-            chunk.section_title
-            and chunk.section_title in expected_sections
-        ):
+    for rank, (chunk, _) in enumerate(top_5_results, start=1):
+        section_title = (
+            chunk.section_title.strip().casefold()
+            if chunk.section_title
+            else ""
+        )
+
+        matched_here = [
+            expected
+            for expected in normalized_expected
+            if expected in section_title
+        ]
+
+        if matched_here:
             matching_top_5_count += 1
+            matched_expected_sections.update(matched_here)
 
             if first_relevant_rank is None:
                 first_relevant_rank = rank
 
-    # ---------------------------------------------------------
-    # Section distribution
-    # ---------------------------------------------------------
-
     sections = [
         chunk.section_title
-        for chunk, _ in reranked_results[:5]
+        for chunk, _ in top_5_results
         if chunk.section_title
     ]
+    section_counts = {}
+    for section in sections:
+        section_counts[section] = section_counts.get(section, 0) + 1
 
     unique_section_count = len(set(sections))
-
-    dominant_section_count = 0
-
-    if sections:
-        section_counts = {}
-
-        for section in sections:
-            section_counts[section] = (
-                section_counts.get(section, 0) + 1
-            )
-
-        dominant_section_count = max(
-            section_counts.values()
-        )
+    dominant_section_count = (
+        max(section_counts.values())
+        if section_counts
+        else 0
+    )
 
     return {
         "best_score": best_score,
         "second_score": second_score,
         "third_score": third_score,
         "score_gap": score_gap,
-        "count_ge_2": count_ge_2,
-        "count_ge_4": count_ge_4,
-        "count_ge_6": count_ge_6,
-        "average_top_3": average_top_3,
-        "average_top_5": average_top_5,
+        "count_ge_2": sum(score >= 2.0 for score in top_5_scores),
+        "count_ge_4": sum(score >= 4.0 for score in top_5_scores),
+        "count_ge_6": sum(score >= 6.0 for score in top_5_scores),
+        "average_top_3": mean(top_3_scores) if top_3_scores else None,
+        "average_top_5": mean(top_5_scores) if top_5_scores else None,
         "matching_top_5_count": matching_top_5_count,
+        "matched_expected_section_count": len(matched_expected_sections),
         "unique_section_count": unique_section_count,
         "dominant_section_count": dominant_section_count,
         "first_relevant_rank": first_relevant_rank,
     }
 
 
-async def evaluate_question(question_data: dict):
+async def evaluate_question(question_data: dict) -> dict:
     question_id = question_data["id"]
     question = question_data["question"]
     answerable = question_data["answerable"]
     expected_sections = question_data["expected_sections"]
 
     async with AsyncSessionLocal() as db:
-
-        # -----------------------------------------------------
-        # Step 1: Hybrid retrieval
-        # -----------------------------------------------------
-
-        hybrid_results = await HybridSearchService.search(
+        # Use the same search service as production ChatService.
+        ranked_results = await DocumentSearchService.search_with_scores(
             db=db,
             query=question,
             user_id=USER_ID,
@@ -286,195 +241,158 @@ async def evaluate_question(question_data: dict):
             max_distance=None,
         )
 
-        if not hybrid_results:
-            print(
-                f"\nQ{question_id} | "
-                f"answerable={answerable} | "
-                f"NO RETRIEVAL RESULTS"
-            )
-
-            return {
-                "question_id": question_id,
-                "answerable": answerable,
-                "evidence_sufficient": False,
-                "first_relevant_rank": None,
-            }
-
-        # -----------------------------------------------------
-        # Step 2: Extract chunks
-        # -----------------------------------------------------
-
-        chunks = [
-            chunk
-            for chunk, _ in hybrid_results
-        ]
-
-        # -----------------------------------------------------
-        # Step 3: Rerank
-        # -----------------------------------------------------
-
-        reranked_results = RerankerService.rerank(
-            question=question,
-            chunks=chunks,
-        )
-
-        # -----------------------------------------------------
-        # Step 4: Calculate diagnostic features
-        # -----------------------------------------------------
-
-        features = calculate_rank_features(
-            reranked_results=reranked_results,
-            expected_sections=expected_sections,
-        )
-
-        # -----------------------------------------------------
-        # Step 5: Production evidence decision
-        #
-        # IMPORTANT:
-        # This uses the production service.
-        # No expected sections or ground truth are passed here.
-        # -----------------------------------------------------
-
-        evidence_sufficient = (
-            EvidenceSufficiencyService.is_sufficient(
-                best_score=features["best_score"],
-                average_top_3=features["average_top_3"],
-                count_ge_2=features["count_ge_2"],
-                dominant_section_count=features[
-                    "dominant_section_count"
-                ],
-            )
-        )
-
-        # -----------------------------------------------------
-        # Print question
-        # -----------------------------------------------------
-
+    if not ranked_results:
         print("\n" + "=" * 80)
-
-        print(
-            f"QUESTION {question_id}: "
-            f"{question}"
-        )
-
-        print(
-            f"answerable={answerable}"
-        )
-
+        print(f"QUESTION {question_id}: {question}")
+        print("NO RETRIEVAL RESULTS")
         print("=" * 80)
 
-        # -----------------------------------------------------
-        # Print top results
-        # -----------------------------------------------------
-
-        for rank, (chunk, score) in enumerate(
-            reranked_results[:5],
-            start=1,
-        ):
-            section = (
-                chunk.section_title
-                if chunk.section_title
-                else "Unknown section"
-            )
-
-            print(
-                f"RANK {rank} | "
-                f"score={float(score):.4f} | "
-                f"chunk_id={chunk.id} | "
-                f"section={section}"
-            )
-
-        # -----------------------------------------------------
-        # Feature summary
-        # -----------------------------------------------------
-
-        print("\nEVIDENCE FEATURE SUMMARY")
-
-        print(
-            f"Q{question_id} | "
-            f"answerable={answerable} | "
-            f"best={features['best_score']:.4f} | "
-            f"gap={features['score_gap']:.4f} | "
-            f">=2:{features['count_ge_2']} | "
-            f">=4:{features['count_ge_4']} | "
-            f">=6:{features['count_ge_6']} | "
-            f"avg3={features['average_top_3']:.4f} | "
-            f"avg5={features['average_top_5']:.4f} | "
-            f"expected_top5={features['matching_top_5_count']} | "
-            f"unique_sections={features['unique_section_count']} | "
-            f"dominant_section={features['dominant_section_count']} | "
-            f"first_rank={features['first_relevant_rank']} | "
-            f"evidence_sufficient={evidence_sufficient}"
-        )
-
+        retrieval_complete = len(expected_sections) == 0
         return {
             "question_id": question_id,
             "answerable": answerable,
-            "evidence_sufficient": evidence_sufficient,
-            "features": features,
+            "evidence_sufficient": False,
+            "retrieval_complete": retrieval_complete,
+            "features": calculate_rank_features([], expected_sections),
         }
+
+    features = calculate_rank_features(
+        ranked_results=ranked_results,
+        expected_sections=expected_sections,
+    )
+    expected_section_count = len({
+        section.strip().casefold()
+        for section in expected_sections
+        if section.strip()
+        })
+    found_section_count = features["matched_expected_section_count"]
+    retrieval_complete = found_section_count == expected_section_count
+
+    if answerable and not retrieval_complete:
+        print(
+            f"\nRETRIEVAL INCOMPLETE | Q{question_id} | "
+            f"expected={expected_section_count} | "
+            f"found={found_section_count}"
+        )
+
+    # Keep the existing production thresholds unchanged.
+    # Ground-truth expected sections are not passed to this decision.
+    evidence_sufficient = EvidenceSufficiencyService.is_sufficient(
+        best_score=features["best_score"],
+        average_top_3=features["average_top_3"],
+        count_ge_2=features["count_ge_2"],
+        dominant_section_count=features["dominant_section_count"],
+    )
+
+    print("\n" + "=" * 80)
+    print(f"QUESTION {question_id}: {question}")
+    print(f"answerable={answerable}")
+    print("=" * 80)
+
+    for rank, (chunk, score) in enumerate(ranked_results[:5], start=1):
+        section = (
+            chunk.section_title
+            if chunk.section_title
+            else "Unknown section"
+        )
+        print(
+            f"RANK {rank} | "
+            f"score={float(score):.4f} | "
+            f"chunk_id={chunk.id} | "
+            f"section={section}"
+        )
+
+    print("\nEVIDENCE FEATURE SUMMARY")
+    best = features["best_score"]
+    gap = features["score_gap"]
+    avg3 = features["average_top_3"]
+    avg5 = features["average_top_5"]
+
+    gap_text = f"{gap:.4f}" if gap is not None else "N/A"
+    avg3_text = f"{avg3:.4f}" if avg3 is not None else "N/A"
+    avg5_text = f"{avg5:.4f}" if avg5 is not None else "N/A"
+
+    print(
+        f"Q{question_id} | "
+        f"answerable={answerable} | "
+        f"best={best:.4f} | "
+        f"gap={gap_text}"
+    )
+    print(
+        f">=2:{features['count_ge_2']} | "
+        f">=4:{features['count_ge_4']} | "
+        f">=6:{features['count_ge_6']} | "
+        f"avg3={avg3_text} | "
+        f"avg5={avg5_text} | "
+        f"expected_top5={features['matching_top_5_count']} | "
+        f"expected_sections_found="
+        f"{features['matched_expected_section_count']} | "
+        f"unique_sections={features['unique_section_count']} | "
+        f"dominant_section={features['dominant_section_count']} | "
+        f"first_rank={features['first_relevant_rank']} | "
+        f"evidence_sufficient={evidence_sufficient} | "
+        f"retrieval_complete={retrieval_complete}"
+    )
+
+    return {
+        "question_id": question_id,
+        "answerable": answerable,
+        "evidence_sufficient": evidence_sufficient,
+        "retrieval_complete": retrieval_complete,
+        "features": features,
+    }
 
 
 async def main():
     results = []
 
     for question_data in RAG_EVALUATION_QUESTIONS:
-        result = await evaluate_question(
-            question_data
-        )
-
+        result = await evaluate_question(question_data)
         results.append(result)
-
-    # ---------------------------------------------------------
-    # Classification summary
-    # ---------------------------------------------------------
 
     true_positive = 0
     false_negative = 0
     true_negative = 0
     false_positive = 0
 
-    for result in results:
+    complete_answerable = 0
+    incomplete_answerable = 0
 
+    for result in results:
         actual = result["answerable"]
         predicted = result["evidence_sufficient"]
 
         if actual and predicted:
             true_positive += 1
-
         elif actual and not predicted:
             false_negative += 1
-
         elif not actual and not predicted:
             true_negative += 1
-
         elif not actual and predicted:
             false_positive += 1
+
+        if actual:
+            if result["retrieval_complete"]:
+                complete_answerable += 1
+            else:
+                incomplete_answerable += 1
 
     print("\n")
     print("=" * 80)
     print("EVIDENCE SUFFICIENCY CLASSIFICATION")
     print("=" * 80)
+    print(f"TRUE_POSITIVE={true_positive}")
+    print(f"FALSE_NEGATIVE={false_negative}")
+    print(f"TRUE_NEGATIVE={true_negative}")
+    print(f"FALSE_POSITIVE={false_positive}")
+    print(f"TOTAL_QUESTIONS={len(results)}")
 
-    print(
-        f"TRUE_POSITIVE={true_positive}"
-    )
-
-    print(
-        f"FALSE_NEGATIVE={false_negative}"
-    )
-
-    print(
-        f"TRUE_NEGATIVE={true_negative}"
-    )
-
-    print(
-        f"FALSE_POSITIVE={false_positive}"
-    )
-
-    print(
-        f"TOTAL_QUESTIONS={len(results)}"
-    )
+    print("\n")
+    print("=" * 80)
+    print("RETRIEVAL COMPLETENESS SUMMARY")
+    print("=" * 80)
+    print(f"ANSWERABLE_WITH_COMPLETE_RETRIEVAL={complete_answerable}")
+    print(f"ANSWERABLE_WITH_INCOMPLETE_RETRIEVAL={incomplete_answerable}")
 
 
 if __name__ == "__main__":

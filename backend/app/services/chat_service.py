@@ -1,13 +1,22 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
-from app.repositories.conversation_repository import ConversationRepository
-from app.repositories.message_repository import MessageRepository
+from app.repositories.conversation_repository import (
+    ConversationRepository,
+)
+from app.repositories.message_repository import (
+    MessageRepository,
+)
 
 from app.services.conversation_history_service import (
     ConversationHistoryService,
 )
-from app.services.document_search_service import DocumentSearchService
+from app.services.query_rewrite_service import (
+    QueryRewriteService,
+)
+from app.services.document_search_service import (
+    DocumentSearchService,
+)
 from app.services.evidence_sufficiency_service import (
     EvidenceSufficiencyService,
 )
@@ -43,7 +52,22 @@ class ChatService:
                 detail="Conversation not found",
             )
 
-        # 2. Save the user's message.
+        # 2. Load previous conversation history BEFORE saving
+        # the current question.
+        messages = await MessageRepository.get_messages(
+            db=db,
+            conversation_id=conversation_id,
+            limit=20,
+        )
+
+        # 3. Format the previous conversation history.
+        conversation_history = (
+            ConversationHistoryService.format_messages(
+                messages
+            )
+        )
+
+        # 4. Save the original user question.
         await MessageRepository.create_message(
             db=db,
             conversation_id=conversation_id,
@@ -51,51 +75,40 @@ class ChatService:
             content=question,
         )
 
-        # 3. Load recent conversation history.
-        messages = await MessageRepository.get_messages(
-            db=db,
-            conversation_id=conversation_id,
-            limit=20,
+        # 5. Rewrite the question for document retrieval.
+        retrieval_query = QueryRewriteService.rewrite(
+            question=question,
+            conversation_history=conversation_history,
         )
 
-        # 4. Format conversation history for the LLM.
-        conversation_history = (
-            ConversationHistoryService.format_messages(
-                messages
-            )
-        )
-
-        # 5. Retrieve and rerank relevant enterprise documents.
-        #
-        # Unlike search(), search_with_scores() preserves
-        # the reranker scores required by the evidence gate.
+        # 6. Retrieve and rerank using the rewritten query.
+        # Preserve reranker scores for the evidence gate.
         reranked_results = (
             await DocumentSearchService.search_with_scores(
                 db=db,
-                query=question,
+                query=retrieval_query,
                 user_id=user_id,
                 limit=limit,
                 max_distance=None,
             )
         )
 
-        # 6. Evaluate whether the retrieved evidence is
-        # sufficiently strong to continue to answer generation.
+
+        # 7. Evaluate whether the retrieved evidence is sufficient.
         evidence_sufficient = (
             EvidenceSufficiencyService.evaluate(
                 reranked_results
             )
         )
 
-        # 7. If evidence is insufficient, do not call the LLM.
+        # 8. Refuse unsupported questions without calling the LLM.
         if not evidence_sufficient:
             answer = (
                 "I don't have enough information "
                 "to answer that question."
             )
 
-            # Store the assistant's fallback response so that
-            # conversation history remains consistent.
+            # Persist the refusal in conversation history.
             await MessageRepository.create_message(
                 db=db,
                 conversation_id=conversation_id,
@@ -108,29 +121,27 @@ class ChatService:
                 citations=[],
             )
 
-        # 8. Extract the chunks from the scored results.
-        #
-        # ContextBuilder and CitationBuilder operate on
-        # DocumentChunk objects rather than (chunk, score) pairs.
+        # 9. Extract chunks from the scored retrieval results.
         chunks = [
             chunk
             for chunk, score in reranked_results
         ]
 
-        # 9. Build document context.
+        # 10. Build context from the retrieved document chunks.
         context = ContextBuilder.build(chunks)
 
-        # 10. Build conversational RAG prompt.
+        # 11. Build the answer prompt.
+        # Use the ORIGINAL question and previous conversation.
         prompt = PromptBuilder.build(
             context=context,
             question=question,
             conversation_history=conversation_history,
         )
 
-        # 11. Generate the answer using the local LLM.
+        # 12. Generate the answer using the local LLM.
         answer = await LLMService.generate(prompt)
 
-        # 12. Save the assistant's answer.
+        # 13. Persist the assistant's answer.
         await MessageRepository.create_message(
             db=db,
             conversation_id=conversation_id,
@@ -138,10 +149,10 @@ class ChatService:
             content=answer,
         )
 
-        # 13. Build authoritative citations from the retrieved chunks.
+        # 14. Build citations from the retrieved chunks.
         citations = CitationBuilder.build(chunks)
 
-        # 14. Return answer and citations.
+        # 15. Return the answer and citations.
         return RAGResponse(
             answer=answer,
             citations=citations,

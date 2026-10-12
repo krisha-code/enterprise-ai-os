@@ -1,45 +1,44 @@
-from app.services.reranker_service import (
-    RerankerService,
-)
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from app.services.reranker_service import RerankerService
 
 
-question = "Who approves an employee's leave request?"
+def test_rerank_orders_chunks_by_model_score():
+    question = "Who approves an employee's leave request?"
 
+    chunks = [
+        SimpleNamespace(
+            content="Employees receive 20 days of annual leave.",
+            section_title="Leave Policy",
+        ),
+        SimpleNamespace(
+            content="Managers approve leave requests.",
+            section_title="Leave Policy",
+        ),
+        SimpleNamespace(
+            content="Employees can contact HR with questions.",
+            section_title="HR Policy",
+        ),
+    ]
 
-chunks = [
-    "Employees receive 20 days of annual leave.",
-    "Managers are responsible for reviewing and approving leave requests.",
-    "Employees can contact HR if they have questions about the leave policy.",
-]
+    with patch.object(
+        RerankerService.model,
+        "predict",
+        return_value=[0.1, 0.9, 0.2],
+    ):
+        results = RerankerService.rerank(
+            question=question,
+            chunks=chunks,
+        )
 
-
-print("===== RERANKING =====")
-
-results = []
-
-for chunk in chunks:
-
-    score = RerankerService.score(
-        question=question,
-        chunk=chunk,
-    )
-
-    results.append(
-        (chunk, score)
-    )
-
-
-results.sort(
-    key=lambda item: item[1],
-    reverse=True,
-)
-
-
-for rank, (chunk, score) in enumerate(
-    results,
-    start=1,
-):
-
-    print(f"\nRank {rank}")
-    print(f"Score: {score}")
-    print(f"Content: {chunk}")
+    assert [chunk.content for chunk, _ in results] == [
+        "Managers approve leave requests.",
+        "Employees can contact HR with questions.",
+        "Employees receive 20 days of annual leave.",
+    ]
+    assert [float(score) for _, score in results] == [
+        0.9,
+        0.2,
+        0.1,
+    ]

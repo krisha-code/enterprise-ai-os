@@ -1,29 +1,53 @@
+from app.schemas.document_chunk import DocumentChunkData
 from app.services.document_chunker import DocumentChunker
 
 
-text = """
-Transportation Policy
+blocks = [
+    DocumentChunkData(
+        content="Employees receive a monthly transportation allowance. "
+        "Employees can use the allowance for approved commuting expenses.",
+        section_title="Transportation Policy",
+        page_number=1,
+    ),
+    DocumentChunkData(
+        content="Employees receive 20 days of annual leave every year. "
+        "Employees must submit leave requests to their manager.",
+        section_title="Leave Policy",
+        page_number=2,
+    ),
+]
 
-Employees receive a monthly transportation allowance.
 
-Employees can use the allowance for approved commuting expenses.
+def test_chunk_text_preserves_section_boundaries():
+    chunks = DocumentChunker.chunk_text(
+        blocks=blocks,
+        chunk_size=120,
+        overlap_sentences=1,
+    )
 
-Leave Policy
+    assert chunks
+    assert all(chunk.content.strip() for chunk in chunks)
+    assert all(
+        chunk.section_title in {
+            "Transportation Policy",
+            "Leave Policy",
+        }
+        for chunk in chunks
+    )
 
-Employees receive 20 days of annual leave every year.
+    assert all(
+        not (
+            "Transportation Policy" in chunk.section_title
+            and "Leave Policy" in chunk.section_title
+        )
+        for chunk in chunks
+    )
 
-Employees must submit leave requests to their manager.
-""".strip()
-
-
-chunks = DocumentChunker.chunk_text(
-    text=text,
-    chunk_size=120,
-    overlap_sentences=1,
-)
-
-for index, chunk in enumerate(chunks, start=1):
-    print(f"\n===== CHUNK {index} =====")
-    print(f"Content: {chunk.content}")
-    print(f"Section: {chunk.section_title}")
-    print(f"Page: {chunk.page_number}")
+    assert any(
+        chunk.section_title == "Transportation Policy"
+        for chunk in chunks
+    )
+    assert any(
+        chunk.section_title == "Leave Policy"
+        for chunk in chunks
+    )

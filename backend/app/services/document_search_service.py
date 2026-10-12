@@ -20,14 +20,10 @@ class DocumentSearchService:
         if not any(term in normalized for term in comparison_terms):
             return query
 
-        # Targeted expansion for the UAV comparison in the evaluation set.
-        # Other comparison queries retain their original query plus these terms,
-        # so evaluate the full dataset before adopting this more broadly.
         return (
             f"{query} "
-            "Fixed-Wing UAV versus Multi-Rotor UAV: "
-            "compare flight duration, hovering, advantages, "
-            "disadvantages, and applications."
+            "Compare their features, similarities, differences, "
+            "advantages, disadvantages, and relevant use cases."
         )
 
     @staticmethod
