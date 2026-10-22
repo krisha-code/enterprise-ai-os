@@ -11,17 +11,29 @@ class DocumentRepository:
         db: AsyncSession,
         user_id: int,
     ) -> list[Document]:
-
         result = await db.execute(
             select(Document)
             .where(
-                Document.user_id == user_id
+                Document.user_id == user_id,
+                Document.is_active.is_(True),
             )
-            .order_by(
-                Document.id.desc()
+            .order_by(Document.id.desc())
+        )
+
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_by_id_and_user(
+        db: AsyncSession,
+        document_id: int,
+        user_id: int,
+    ) -> Document | None:
+        result = await db.execute(
+            select(Document).where(
+                Document.id == document_id,
+                Document.user_id == user_id,
+                Document.is_active.is_(True),
             )
         )
 
-        return list(
-            result.scalars().all()
-        )
+        return result.scalar_one_or_none()

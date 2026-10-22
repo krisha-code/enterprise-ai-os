@@ -5,7 +5,8 @@ from app.services.hybrid_search_service import HybridSearchService
 
 
 async def main():
-    query = "What is crop health detection?"
+    query =( "What are the advantages of fixed-wing UAV?"
+    )
 
     async with AsyncSessionLocal() as db:
         results = await HybridSearchService.debug_search(

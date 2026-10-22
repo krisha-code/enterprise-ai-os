@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
@@ -67,3 +67,20 @@ async def search_documents(
         user_id=current_user.id,
         limit=limit,
     )
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await DocumentService.delete_document(
+        db=db,
+        document_id=document_id,
+        user=current_user,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

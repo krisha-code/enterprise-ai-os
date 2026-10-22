@@ -1,4 +1,3 @@
-
 import re
 
 
@@ -67,6 +66,17 @@ class QueryRewriteService:
             return question
 
         _, uav_type = max(mentions, key=lambda item: item[0])
+
+        # Resolve follow-ups about large-area surveying.
+        if re.fullmatch(
+            r"why is it suitable for large[- ]area surveying\??",
+            question,
+            flags=re.IGNORECASE,
+        ):
+            return (
+                f"Why is a {uav_type} suitable for "
+                "large-area surveying?"
+            )
 
         # Rewrite only follow-up questions we explicitly understand.
         for pattern, topic, plural in QueryRewriteService.FOLLOW_UP_PATTERNS:

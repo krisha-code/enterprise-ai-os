@@ -1,16 +1,20 @@
+
 import asyncio
 from statistics import mean
 
 from app.database.session import AsyncSessionLocal
 from app.models.document_chunk import DocumentChunk
 from app.services.document_search_service import DocumentSearchService
-from app.services.evidence_sufficiency_service import EvidenceSufficiencyService
+from app.services.evidence_sufficiency_service import (
+    EvidenceSufficiencyService,
+)
 
 
 USER_ID = 1
 
 # Match the production search call: retrieve and rank up to 20 results.
 RETRIEVAL_LIMIT = 20
+
 
 RAG_EVALUATION_QUESTIONS = [
     {
@@ -60,7 +64,9 @@ RAG_EVALUATION_QUESTIONS = [
     },
     {
         "id": 8,
-        "question": "What agricultural uses are mentioned for multi-rotor UAVs?",
+        "question": (
+            "What agricultural uses are mentioned for multi-rotor UAVs?"
+        ),
         "answerable": True,
         "expected_sections": ["2. Multi-Rotor UAV"],
     },
@@ -102,7 +108,9 @@ RAG_EVALUATION_QUESTIONS = [
     },
     {
         "id": 15,
-        "question": "Who manufactures the UAVs described in the document?",
+        "question": (
+            "Who manufactures the UAVs described in the document?"
+        ),
         "answerable": False,
         "expected_sections": [],
     },
@@ -114,11 +122,12 @@ def calculate_rank_features(
     expected_sections: list[str],
 ) -> dict:
     """
-    Calculate evaluation diagnostics for the returned ranking.
+    Calculate ranking diagnostics and retrieval completeness.
 
-    Expected section names are used only to measure retrieval completeness.
-    They are never passed into the evidence-sufficiency decision.
+    Expected section names are used only to measure retrieval
+    completeness. They are never passed to the evidence decision.
     """
+
     if not ranked_results:
         return {
             "best_score": None,
@@ -137,30 +146,40 @@ def calculate_rank_features(
             "first_relevant_rank": None,
         }
 
-    # Results are ordered by the production cross-encoder reranker.
-    # Compute score statistics from the returned top-five results.
+    # Search results are already ordered by the production reranker.
     top_5_results = ranked_results[:5]
-    top_5_scores = [float(score) for _, score in top_5_results]
+    top_5_scores = [
+        float(score) for _, score in top_5_results
+    ]
     top_3_scores = top_5_scores[:3]
-    sorted_top_5_scores = sorted(top_5_scores, reverse=True)
+
+    # Calculate the top scores and their separation.
+    sorted_top_5_scores = sorted(
+        top_5_scores,
+        reverse=True,
+    )
 
     best_score = sorted_top_5_scores[0]
+
     second_score = (
         sorted_top_5_scores[1]
         if len(sorted_top_5_scores) > 1
         else None
     )
+
     third_score = (
         sorted_top_5_scores[2]
         if len(sorted_top_5_scores) > 2
         else None
     )
+
     score_gap = (
         best_score - second_score
         if second_score is not None
         else None
     )
 
+    # Normalize expected section names for comparison.
     normalized_expected = [
         section.strip().casefold()
         for section in expected_sections
@@ -171,7 +190,10 @@ def calculate_rank_features(
     matched_expected_sections = set()
     first_relevant_rank = None
 
-    for rank, (chunk, _) in enumerate(top_5_results, start=1):
+    for rank, (chunk, _) in enumerate(
+        top_5_results,
+        start=1,
+    ):
         section_title = (
             chunk.section_title.strip().casefold()
             if chunk.section_title
@@ -191,16 +213,22 @@ def calculate_rank_features(
             if first_relevant_rank is None:
                 first_relevant_rank = rank
 
+    # Calculate section concentration among the top five.
     sections = [
         chunk.section_title
         for chunk, _ in top_5_results
         if chunk.section_title
     ]
+
     section_counts = {}
+
     for section in sections:
-        section_counts[section] = section_counts.get(section, 0) + 1
+        section_counts[section] = (
+            section_counts.get(section, 0) + 1
+        )
 
     unique_section_count = len(set(sections))
+
     dominant_section_count = (
         max(section_counts.values())
         if section_counts
@@ -212,13 +240,25 @@ def calculate_rank_features(
         "second_score": second_score,
         "third_score": third_score,
         "score_gap": score_gap,
-        "count_ge_2": sum(score >= 2.0 for score in top_5_scores),
-        "count_ge_4": sum(score >= 4.0 for score in top_5_scores),
-        "count_ge_6": sum(score >= 6.0 for score in top_5_scores),
-        "average_top_3": mean(top_3_scores) if top_3_scores else None,
-        "average_top_5": mean(top_5_scores) if top_5_scores else None,
+        "count_ge_2": sum(
+            score >= 2.0 for score in top_5_scores
+        ),
+        "count_ge_4": sum(
+            score >= 4.0 for score in top_5_scores
+        ),
+        "count_ge_6": sum(
+            score >= 6.0 for score in top_5_scores
+        ),
+        "average_top_3": (
+            mean(top_3_scores) if top_3_scores else None
+        ),
+        "average_top_5": (
+            mean(top_5_scores) if top_5_scores else None
+        ),
         "matching_top_5_count": matching_top_5_count,
-        "matched_expected_section_count": len(matched_expected_sections),
+        "matched_expected_section_count": len(
+            matched_expected_sections
+        ),
         "unique_section_count": unique_section_count,
         "dominant_section_count": dominant_section_count,
         "first_relevant_rank": first_relevant_rank,
@@ -233,12 +273,14 @@ async def evaluate_question(question_data: dict) -> dict:
 
     async with AsyncSessionLocal() as db:
         # Use the same search service as production ChatService.
-        ranked_results = await DocumentSearchService.search_with_scores(
-            db=db,
-            query=question,
-            user_id=USER_ID,
-            limit=RETRIEVAL_LIMIT,
-            max_distance=None,
+        ranked_results = (
+            await DocumentSearchService.search_with_scores(
+                db=db,
+                query=question,
+                user_id=USER_ID,
+                limit=RETRIEVAL_LIMIT,
+                max_distance=None,
+            )
         )
 
     if not ranked_results:
@@ -248,25 +290,36 @@ async def evaluate_question(question_data: dict) -> dict:
         print("=" * 80)
 
         retrieval_complete = len(expected_sections) == 0
+
         return {
             "question_id": question_id,
             "answerable": answerable,
             "evidence_sufficient": False,
             "retrieval_complete": retrieval_complete,
-            "features": calculate_rank_features([], expected_sections),
+            "features": calculate_rank_features(
+                [],
+                expected_sections,
+            ),
         }
 
     features = calculate_rank_features(
         ranked_results=ranked_results,
         expected_sections=expected_sections,
     )
+
     expected_section_count = len({
         section.strip().casefold()
         for section in expected_sections
         if section.strip()
-        })
-    found_section_count = features["matched_expected_section_count"]
-    retrieval_complete = found_section_count == expected_section_count
+    })
+
+    found_section_count = features[
+        "matched_expected_section_count"
+    ]
+
+    retrieval_complete = (
+        found_section_count == expected_section_count
+    )
 
     if answerable and not retrieval_complete:
         print(
@@ -275,13 +328,19 @@ async def evaluate_question(question_data: dict) -> dict:
             f"found={found_section_count}"
         )
 
-    # Keep the existing production thresholds unchanged.
-    # Ground-truth expected sections are not passed to this decision.
-    evidence_sufficient = EvidenceSufficiencyService.is_sufficient(
-        best_score=features["best_score"],
-        average_top_3=features["average_top_3"],
-        count_ge_2=features["count_ge_2"],
-        dominant_section_count=features["dominant_section_count"],
+    # Apply the same evidence-sufficiency rules as production.
+    # The score gap is passed to support the new Rule 2B.
+    # Expected sections are not used in this decision.
+    evidence_sufficient = (
+        EvidenceSufficiencyService.is_sufficient(
+            best_score=features["best_score"],
+            average_top_3=features["average_top_3"],
+            count_ge_2=features["count_ge_2"],
+            dominant_section_count=features[
+                "dominant_section_count"
+            ],
+            score_gap=features["score_gap"],
+        )
     )
 
     print("\n" + "=" * 80)
@@ -289,12 +348,16 @@ async def evaluate_question(question_data: dict) -> dict:
     print(f"answerable={answerable}")
     print("=" * 80)
 
-    for rank, (chunk, score) in enumerate(ranked_results[:5], start=1):
+    for rank, (chunk, score) in enumerate(
+        ranked_results[:5],
+        start=1,
+    ):
         section = (
             chunk.section_title
             if chunk.section_title
             else "Unknown section"
         )
+
         print(
             f"RANK {rank} | "
             f"score={float(score):.4f} | "
@@ -303,14 +366,21 @@ async def evaluate_question(question_data: dict) -> dict:
         )
 
     print("\nEVIDENCE FEATURE SUMMARY")
+
     best = features["best_score"]
     gap = features["score_gap"]
     avg3 = features["average_top_3"]
     avg5 = features["average_top_5"]
 
-    gap_text = f"{gap:.4f}" if gap is not None else "N/A"
-    avg3_text = f"{avg3:.4f}" if avg3 is not None else "N/A"
-    avg5_text = f"{avg5:.4f}" if avg5 is not None else "N/A"
+    gap_text = (
+        f"{gap:.4f}" if gap is not None else "N/A"
+    )
+    avg3_text = (
+        f"{avg3:.4f}" if avg3 is not None else "N/A"
+    )
+    avg5_text = (
+        f"{avg5:.4f}" if avg5 is not None else "N/A"
+    )
 
     print(
         f"Q{question_id} | "
@@ -318,6 +388,7 @@ async def evaluate_question(question_data: dict) -> dict:
         f"best={best:.4f} | "
         f"gap={gap_text}"
     )
+
     print(
         f">=2:{features['count_ge_2']} | "
         f">=4:{features['count_ge_4']} | "
@@ -368,7 +439,7 @@ async def main():
             false_negative += 1
         elif not actual and not predicted:
             true_negative += 1
-        elif not actual and predicted:
+        else:
             false_positive += 1
 
         if actual:
@@ -391,8 +462,14 @@ async def main():
     print("=" * 80)
     print("RETRIEVAL COMPLETENESS SUMMARY")
     print("=" * 80)
-    print(f"ANSWERABLE_WITH_COMPLETE_RETRIEVAL={complete_answerable}")
-    print(f"ANSWERABLE_WITH_INCOMPLETE_RETRIEVAL={incomplete_answerable}")
+    print(
+        "ANSWERABLE_WITH_COMPLETE_RETRIEVAL="
+        f"{complete_answerable}"
+    )
+    print(
+        "ANSWERABLE_WITH_INCOMPLETE_RETRIEVAL="
+        f"{incomplete_answerable}"
+    )
 
 
 if __name__ == "__main__":

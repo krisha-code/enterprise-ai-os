@@ -29,5 +29,5 @@ async def chat(
         conversation_id=conversation_id,
         user_id=current_user.id,
         question=request.question,
-        limit=2,
+        limit=5,
     )

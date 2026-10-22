@@ -40,6 +40,17 @@ class Document(Base):
         nullable=False,
         default=True,
     )
+
+    processing_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="completed",
+    )
+
+    processing_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
     
     extracted_text: Mapped[str | None] = mapped_column(
         Text,

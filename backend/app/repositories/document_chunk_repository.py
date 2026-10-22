@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +17,21 @@ class DocumentChunkRepository:
         section_titles: list[str | None] | None = None,
         page_numbers: list[int | None] | None = None,
     ) -> list[DocumentChunk]:
+
+        if len(chunks) != len(embeddings):
+            raise ValueError(
+                "Chunk count does not match embedding count"
+            )
+
+        if section_titles is not None and len(section_titles) != len(chunks):
+            raise ValueError(
+                "Chunk count does not match section-title count"
+            )
+
+        if page_numbers is not None and len(page_numbers) != len(chunks):
+            raise ValueError(
+                "Chunk count does not match page-number count"
+            )
 
         document_chunks = []
 
@@ -45,9 +60,21 @@ class DocumentChunkRepository:
             document_chunks.append(document_chunk)
 
         db.add_all(document_chunks)
-        await db.commit()
+        await db.flush()
 
         return document_chunks
+
+    @staticmethod
+    async def delete_by_document(
+        db: AsyncSession,
+        document_id: int,
+    ) -> None:
+        await db.execute(
+            delete(DocumentChunk).where(
+                DocumentChunk.document_id == document_id
+            )
+        )
+        await db.flush()
 
     @staticmethod
     async def similarity_search(
@@ -70,6 +97,7 @@ class DocumentChunkRepository:
             .where(
                 Document.user_id == user_id,
                 Document.is_active.is_(True),
+                Document.processing_status == "completed",
                 DocumentChunk.embedding.is_not(None),
             )
             .order_by(distance)
@@ -106,6 +134,7 @@ class DocumentChunkRepository:
             .where(
                 Document.user_id == user_id,
                 Document.is_active.is_(True),
+                Document.processing_status == "completed",
                 DocumentChunk.embedding.is_not(None),
             )
         )
@@ -172,6 +201,7 @@ class DocumentChunkRepository:
             .where(
                 Document.user_id == user_id,
                 Document.is_active.is_(True),
+                Document.processing_status == "completed",
                 search_vector.op("@@")(search_query),
             )
             .order_by(rank.desc())
