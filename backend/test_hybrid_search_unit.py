@@ -36,7 +36,7 @@ def test_search_combines_vector_and_keyword_results():
                 "app.services.hybrid_search_service.DocumentChunkRepository.keyword_search",
                 new_callable=AsyncMock,
                 return_value=keyword_results,
-            ),
+            ) as keyword_search,
         ):
             results = await HybridSearchService.search(
                 db=object(),
@@ -54,6 +54,7 @@ def test_search_combines_vector_and_keyword_results():
             HybridSearchService.rrf_score(2)
             + HybridSearchService.rrf_score(2)
         )
+        assert keyword_search.await_args.kwargs["organization_id"] == 7
 
     asyncio.run(run_test())
 

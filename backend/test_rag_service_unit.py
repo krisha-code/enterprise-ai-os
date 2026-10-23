@@ -23,7 +23,13 @@ def test_no_retrieval_results_returns_insufficient_evidence():
 
         assert response.answer == RAGService.INSUFFICIENT_EVIDENCE_MESSAGE
         assert response.citations == []
-        search.assert_awaited_once()
+        search.assert_awaited_once_with(
+            db=None,
+            query="Who approves leave?",
+            organization_id=1,
+            limit=5,
+            max_distance=None,
+        )
         generate.assert_not_awaited()
 
     asyncio.run(run_test())

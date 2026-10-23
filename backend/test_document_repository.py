@@ -94,3 +94,22 @@ def test_get_by_user_filters_inactive_documents():
         assert "documents.is_active" in sql
 
     asyncio.run(run_test())
+
+
+def test_get_by_id_and_organization_filters_to_requested_organization():
+    async def run_test():
+        db = FakeDB(FakeResult(None))
+
+        result = await DocumentRepository.get_by_id_and_organization(
+            db=db,
+            document_id=10,
+            organization_id=42,
+        )
+
+        assert result is None
+        sql = str(db.statements[0])
+        params = db.statements[0].compile().params
+        assert "documents.organization_id" in sql
+        assert 42 in params.values()
+
+    asyncio.run(run_test())
