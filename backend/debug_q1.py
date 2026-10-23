@@ -5,7 +5,7 @@ from app.services.embedding_service import EmbeddingService
 from app.repositories.document_chunk_repository import DocumentChunkRepository
 
 
-USER_ID = 1
+ORGANIZATION_ID = 1
 QUESTION = "What is covered in MODULE 1?"
 
 
@@ -19,7 +19,7 @@ async def main():
         results = await DocumentChunkRepository.similarity_search_with_scores(
             db=db,
             query_embedding=query_embedding,
-            user_id=USER_ID,
+            organization_id=ORGANIZATION_ID,
             limit=20,
             max_distance=None,
         )

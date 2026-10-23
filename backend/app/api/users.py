@@ -36,6 +36,7 @@ async def create_user(
     return await UserService.create_user(
         db,
         user,
+        current_user.organization_id,
     )
 
 
@@ -61,6 +62,7 @@ async def get_users(
 ):
     return await UserService.get_users(
         db,
+        current_user.organization_id,
         name,
         skip,
         limit,
@@ -84,6 +86,7 @@ async def get_all_users_admin(
 ):
     return await UserService.get_users(
         db,
+        current_user.organization_id,
     )
 
 
@@ -103,6 +106,7 @@ async def deactivate_user(
     return await UserService.deactivate_user(
         db,
         user_id,
+        current_user.organization_id,
     )
 
 
@@ -118,6 +122,7 @@ async def activate_user(
     return await UserService.activate_user(
         db,
         user_id,
+        current_user.organization_id,
     )
 
 @router.get(
@@ -145,6 +150,7 @@ async def get_user(
     return await UserService.get_user(
         db,
         user_id,
+        current_user.organization_id,
     )
 
 
@@ -169,6 +175,7 @@ async def update_user(
         db,
         user_id,
         user,
+        current_user.organization_id,
     )
 
 
@@ -191,6 +198,7 @@ async def delete_user(
     await UserService.delete_user(
         db,
         user_id,
+        current_user.organization_id,
     )
 
     return Response(

@@ -14,12 +14,14 @@ class UserRepository:
         user_data: UserCreate,
         password_hash: str,
         role_id: int,
+        organization_id: int,
     ) -> User:
         user = User(
             name=user_data.name,
             email=user_data.email,
             password_hash=password_hash,
             role_id=role_id,
+            organization_id=organization_id,
         )
 
         db.add(user)
@@ -63,6 +65,7 @@ class UserRepository:
     @staticmethod
     async def get_filtered(
         db: AsyncSession,
+        organization_id: int | None = None,
         name: str | None = None,
         skip: int = 0,
         limit: int = 10,
@@ -73,6 +76,11 @@ class UserRepository:
         query = select(User).options(
             selectinload(User.role)
         )
+
+        if organization_id is not None:
+            query = query.where(
+                User.organization_id == organization_id
+            )
 
         if name:
             query = query.where(
@@ -109,15 +117,18 @@ class UserRepository:
     async def get_by_id(
         db: AsyncSession,
         user_id: int,
+        organization_id: int | None = None,
     ) -> User | None:
-
-        result = await db.execute(
-            select(User)
-            .where(User.id == user_id)
-            .options(
-                selectinload(User.role)
-            )
+        query = select(User).where(User.id == user_id).options(
+            selectinload(User.role)
         )
+
+        if organization_id is not None:
+            query = query.where(
+                User.organization_id == organization_id
+            )
+
+        result = await db.execute(query)
 
         return result.scalar_one_or_none()
 

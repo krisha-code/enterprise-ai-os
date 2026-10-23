@@ -13,7 +13,7 @@ async def main():
         result = await RAGService.answer(
             db=db,
             question=question,
-            user_id=1,
+            organization_id=1,
             limit=3,
         )
 

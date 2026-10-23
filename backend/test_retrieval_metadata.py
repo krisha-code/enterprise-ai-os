@@ -30,7 +30,7 @@ async def main():
             .similarity_search_with_scores(
                 db=db,
                 query_embedding=query_embedding,
-                user_id=1,
+                organization_id=1,
                 limit=5,
                 max_distance=0.55,
             )

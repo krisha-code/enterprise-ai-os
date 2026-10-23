@@ -84,13 +84,13 @@ def test_get_by_user_filters_inactive_documents():
 
         result = await DocumentRepository.get_by_user(
             db=db,
-            user_id=7,
+            organization_id=7,
         )
 
         assert result == []
 
         sql = str(db.statements[0])
-        assert "documents.user_id" in sql
+        assert "documents.organization_id" in sql
         assert "documents.is_active" in sql
 
     asyncio.run(run_test())

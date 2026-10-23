@@ -20,7 +20,7 @@ async def main():
         chunks = await DocumentSearchService.search(
             db=db,
             query=question,
-            user_id=1,
+            organization_id=1,
             limit=3,
             max_distance=0.55,
         )

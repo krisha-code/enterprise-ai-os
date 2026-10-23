@@ -52,6 +52,7 @@ def test_llm_connection_failure_returns_503_and_records_failure():
                     db=None,
                     conversation_id=3,
                     user_id=1,
+                    organization_id=1,
                     question="Who approves leave?",
                 )
 

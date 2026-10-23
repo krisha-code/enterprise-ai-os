@@ -13,7 +13,7 @@ from app.services.document_service import DocumentService
 def test_delete_document_returns_404_when_not_owned():
     async def run_test():
         db = AsyncMock()
-        user = SimpleNamespace(id=7)
+        user = SimpleNamespace(id=7, role=SimpleNamespace(name="user"))
 
         with patch(
             "app.services.document_service.DocumentRepository.get_by_id_and_user",
@@ -36,7 +36,7 @@ def test_delete_document_returns_404_when_not_owned():
 def test_delete_document_removes_chunks_and_deactivates_document():
     async def run_test():
         db = AsyncMock()
-        user = SimpleNamespace(id=7)
+        user = SimpleNamespace(id=7, role=SimpleNamespace(name="user"))
         document = SimpleNamespace(
             id=42,
             is_active=True,
@@ -75,7 +75,7 @@ def test_delete_document_removes_chunks_and_deactivates_document():
 def test_delete_document_rolls_back_when_database_cleanup_fails():
     async def run_test():
         db = AsyncMock()
-        user = SimpleNamespace(id=7)
+        user = SimpleNamespace(id=7, role=SimpleNamespace(name="user"))
         document = SimpleNamespace(
             id=42,
             is_active=True,
@@ -113,7 +113,7 @@ def test_delete_document_rolls_back_when_database_cleanup_fails():
 def test_delete_document_logs_filesystem_cleanup_failure(caplog):
     async def run_test():
         db = AsyncMock()
-        user = SimpleNamespace(id=7)
+        user = SimpleNamespace(id=7, role=SimpleNamespace(name="user"))
         document = SimpleNamespace(
             id=42,
             is_active=True,

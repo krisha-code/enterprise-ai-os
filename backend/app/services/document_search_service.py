@@ -30,7 +30,7 @@ class DocumentSearchService:
     async def search_with_scores(
         db,
         query,
-        user_id,
+        organization_id,
         limit=5,
         max_distance=None,
     ):
@@ -43,7 +43,7 @@ class DocumentSearchService:
         hybrid_results = await HybridSearchService.search(
             db=db,
             query=search_query,
-            user_id=user_id,
+            organization_id=organization_id,
             limit=candidate_limit,
             max_distance=max_distance,
         )
@@ -65,7 +65,7 @@ class DocumentSearchService:
     async def search(
         db,
         query,
-        user_id,
+        organization_id,
         limit=5,
         max_distance=None,
     ):
@@ -73,7 +73,7 @@ class DocumentSearchService:
             await DocumentSearchService.search_with_scores(
                 db=db,
                 query=query,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=limit,
                 max_distance=max_distance,
             )

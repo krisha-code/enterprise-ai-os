@@ -17,6 +17,7 @@ class UserService:
     async def create_user(
         db: AsyncSession,
         user_data: UserCreate,
+        organization_id: int,
     ) -> User:
 
         existing_user = await UserRepository.get_by_email(
@@ -53,11 +54,13 @@ class UserService:
             user_data,
             password_hash,
             user_role.id,
+            organization_id,
         )
 
     @staticmethod
     async def get_users(
         db: AsyncSession,
+        organization_id: int,
         name: str | None = None,
         skip: int = 0,
         limit: int = 10,
@@ -67,6 +70,7 @@ class UserService:
 
         return await UserRepository.get_filtered(
             db,
+            organization_id,
             name,
             skip,
             limit,
@@ -78,11 +82,13 @@ class UserService:
     async def get_user(
         db: AsyncSession,
         user_id: int,
+        organization_id: int,
     ) -> User:
 
         user = await UserRepository.get_by_id(
             db,
             user_id,
+            organization_id,
         )
 
         if not user:
@@ -98,11 +104,13 @@ class UserService:
         db: AsyncSession,
         user_id: int,
         user_data: UserUpdate,
+        organization_id: int,
     ) -> User:
 
         user = await UserRepository.get_by_id(
             db,
             user_id,
+            organization_id,
         )
 
         if not user:
@@ -137,11 +145,13 @@ class UserService:
     async def delete_user(
         db: AsyncSession,
         user_id: int,
+        organization_id: int,
     ) -> None:
 
         user = await UserRepository.get_by_id(
             db,
             user_id,
+            organization_id,
         )
 
         if not user:
@@ -158,11 +168,13 @@ class UserService:
     async def deactivate_user(
         db: AsyncSession,
         user_id: int,
+        organization_id: int,
     ) -> User:
 
         user = await UserRepository.get_by_id(
             db,
             user_id,
+            organization_id,
         )
 
         if not user:
@@ -188,11 +200,13 @@ class UserService:
     async def activate_user(
         db: AsyncSession,
         user_id: int,
+        organization_id: int,
     ) -> User:
 
         user = await UserRepository.get_by_id(
             db,
             user_id,
+            organization_id,
         )
 
         if not user:

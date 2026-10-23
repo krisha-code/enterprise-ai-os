@@ -15,7 +15,7 @@ async def main():
         results = await HybridSearchService.search(
             db=db,
             query=query,
-            user_id=1,
+            organization_id=1,
             limit=5,
         )
 

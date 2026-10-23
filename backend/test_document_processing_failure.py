@@ -14,7 +14,7 @@ def test_processing_failure_marks_document_failed_and_removes_file(tmp_path):
     async def run_test():
         db = AsyncMock()
         db.add = Mock()
-        user = SimpleNamespace(id=7)
+        user = SimpleNamespace(id=7, organization_id=1)
         upload_dir = tmp_path / "documents"
         document = SimpleNamespace(
             id=42,

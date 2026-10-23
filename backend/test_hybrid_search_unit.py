@@ -41,7 +41,7 @@ def test_search_combines_vector_and_keyword_results():
             results = await HybridSearchService.search(
                 db=object(),
                 query="test query",
-                user_id=7,
+                organization_id=7,
                 limit=5,
             )
 
@@ -84,7 +84,7 @@ def test_search_limits_number_of_results():
             results = await HybridSearchService.search(
                 db=object(),
                 query="test query",
-                user_id=7,
+                organization_id=7,
                 limit=2,
             )
 

@@ -64,7 +64,7 @@ async def search_documents(
     return await DocumentSearchService.search(
         db=db,
         query=query,
-        user_id=current_user.id,
+        organization_id=current_user.organization_id,
         limit=limit,
     )
 

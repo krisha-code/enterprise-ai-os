@@ -21,6 +21,12 @@ class Document(Base):
         index=True,
     )
 
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+    )
+
     filename: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -35,6 +41,7 @@ class Document(Base):
         String(100),
         nullable=False,
     )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -51,7 +58,7 @@ class Document(Base):
         Text,
         nullable=True,
     )
-    
+
     extracted_text: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -68,6 +75,10 @@ class Document(Base):
         back_populates="documents",
     )
 
+    organization = relationship(
+        "Organization",
+        back_populates="documents",
+    )
 
     chunks = relationship(
         "DocumentChunk",

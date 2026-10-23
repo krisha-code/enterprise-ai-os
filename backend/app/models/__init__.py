@@ -8,11 +8,13 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.organization import Organization
 __all__ = [
     "User",
     "Role",
     "Permission",
     "RolePermission",
     "Conversation",
-    "Message"
+    "Message",
+    "Organization",
 ]

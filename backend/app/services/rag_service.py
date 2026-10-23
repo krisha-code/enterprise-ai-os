@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.rag import RAGResponse
+from app.services.answer_validation_service import AnswerValidationService
 from app.services.citation_builder import CitationBuilder
 from app.services.context_builder import ContextBuilder
 from app.services.document_search_service import DocumentSearchService
@@ -20,7 +21,7 @@ class RAGService:
     async def answer(
         db: AsyncSession,
         question: str,
-        user_id: int,
+        organization_id: int,
         limit: int = 5,
     ) -> RAGResponse:
 
@@ -32,7 +33,7 @@ class RAGService:
             await DocumentSearchService.search_with_scores(
                 db=db,
                 query=question,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=limit,
                 max_distance=None,
             )
@@ -99,13 +100,33 @@ class RAGService:
         answer = await LLMService.generate(prompt)
 
         # --------------------------------------------------
-        # Step 9: Build citations
+        # Step 9: Validate the generated answer against evidence
         # --------------------------------------------------
 
-        citations = CitationBuilder.build(chunks)
+        is_valid = AnswerValidationService.validate(
+            answer=answer,
+            context=context,
+            question=question,
+        )
+
+        if not is_valid:
+            return RAGResponse(
+                answer=RAGService.INSUFFICIENT_EVIDENCE_MESSAGE,
+                citations=[],
+            )
 
         # --------------------------------------------------
-        # Step 10: Return final response
+        # Step 10: Cite only likely supporting evidence
+        # --------------------------------------------------
+
+        citations = CitationBuilder.build_relevant(
+            chunks=chunks,
+            answer=answer,
+            question=question,
+        )
+
+        # --------------------------------------------------
+        # Step 11: Return final response
         # --------------------------------------------------
 
         return RAGResponse(

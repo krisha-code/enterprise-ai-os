@@ -19,7 +19,7 @@ class HybridSearchService:
     async def search(
         db: AsyncSession,
         query: str,
-        user_id: int,
+        organization_id: int,
         limit: int = 20,
         max_distance: float | None =None,
     ):
@@ -39,7 +39,7 @@ class HybridSearchService:
             await DocumentChunkRepository.similarity_search_with_scores(
                 db=db,
                 query_embedding=query_embedding,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=limit,
                 max_distance=max_distance,
             )
@@ -53,7 +53,7 @@ class HybridSearchService:
             await DocumentChunkRepository.keyword_search(
                 db=db,
                 query_text=query,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=limit,
             )
         )
@@ -109,7 +109,7 @@ class HybridSearchService:
     async def debug_search(
         db: AsyncSession,
         query: str,
-        user_id: int,
+        organization_id: int,
         candidate_limit: int = 20,
         max_distance: float | None = None,
     ):
@@ -121,7 +121,7 @@ class HybridSearchService:
             await DocumentChunkRepository.similarity_search_with_scores(
                 db=db,
                 query_embedding=query_embedding,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=candidate_limit,
                 max_distance=max_distance,
             )
@@ -131,7 +131,7 @@ class HybridSearchService:
             await DocumentChunkRepository.keyword_search(
                 db=db,
                 query_text=query,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=candidate_limit,
             )
         )

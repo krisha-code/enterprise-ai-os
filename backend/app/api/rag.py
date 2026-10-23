@@ -26,6 +26,6 @@ async def ask_rag(
     return await RAGService.answer(
         db=db,
         question=request.question,
-        user_id=current_user.id,
-        limit=2,
+        organization_id=current_user.organization_id,
+        limit=5,
     )

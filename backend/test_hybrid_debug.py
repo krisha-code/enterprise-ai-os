@@ -12,7 +12,7 @@ async def main():
         results = await HybridSearchService.debug_search(
             db=db,
             query=query,
-            user_id=1,
+            organization_id=1,
             candidate_limit=20,
         )
 

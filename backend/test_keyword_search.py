@@ -16,7 +16,7 @@ async def main():
             DocumentChunkRepository.keyword_search(
                 db=db,
                 query_text=query,
-                user_id=1,
+                organization_id=1,
                 limit=5,
             )
         )

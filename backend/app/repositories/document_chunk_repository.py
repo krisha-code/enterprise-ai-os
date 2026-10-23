@@ -80,7 +80,7 @@ class DocumentChunkRepository:
     async def similarity_search(
         db: AsyncSession,
         query_embedding: list[float],
-        user_id: int,
+        organization_id: int,
         limit: int = 5,
     ) -> list[DocumentChunk]:
 
@@ -95,7 +95,7 @@ class DocumentChunkRepository:
                 Document.id == DocumentChunk.document_id,
             )
             .where(
-                Document.user_id == user_id,
+                Document.organization_id == organization_id,
                 Document.is_active.is_(True),
                 Document.processing_status == "completed",
                 DocumentChunk.embedding.is_not(None),
@@ -110,7 +110,7 @@ class DocumentChunkRepository:
     async def similarity_search_with_scores(
         db: AsyncSession,
         query_embedding: list[float],
-        user_id: int,
+        organization_id: int,
         limit: int = 5,
         max_distance: float | None = None,
     ):
@@ -132,7 +132,7 @@ class DocumentChunkRepository:
                 Document.id == DocumentChunk.document_id,
             )
             .where(
-                Document.user_id == user_id,
+                Document.organization_id == organization_id,
                 Document.is_active.is_(True),
                 Document.processing_status == "completed",
                 DocumentChunk.embedding.is_not(None),
@@ -158,7 +158,7 @@ class DocumentChunkRepository:
     async def keyword_search(
         db: AsyncSession,
         query_text: str,
-        user_id: int,
+        organization_id: int,
         limit: int = 5,
     ):
 
@@ -199,7 +199,7 @@ class DocumentChunkRepository:
                 Document.id == DocumentChunk.document_id,
             )
             .where(
-                Document.user_id == user_id,
+                Document.organization_id == organization_id,
                 Document.is_active.is_(True),
                 Document.processing_status == "completed",
                 search_vector.op("@@")(search_query),

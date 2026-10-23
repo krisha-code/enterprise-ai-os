@@ -40,11 +40,21 @@ class User(Base):
         nullable=False,
     )
 
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+    )
+
     role = relationship(
         "Role",
         back_populates="users",
     )
 
+    organization = relationship(
+        "Organization",
+        back_populates="users",
+    )
 
     refresh_tokens = relationship(
         "RefreshToken",
@@ -53,18 +63,16 @@ class User(Base):
     )
 
     password_reset_tokens = relationship(
-    "PasswordResetToken",
-    back_populates="user",
-    cascade="all, delete-orphan",
-    ) 
-
-
-    documents = relationship(
-    "Document",
-    back_populates="user",
-    cascade="all, delete-orphan",
+        "PasswordResetToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
+    documents = relationship(
+        "Document",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     conversations = relationship(
         "Conversation",

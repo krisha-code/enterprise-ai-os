@@ -94,6 +94,7 @@ class DocumentService:
 
             document = Document(
                 user_id=user.id,
+                organization_id=user.organization_id,
                 filename=original_filename,
                 file_path=str(file_path),
                 content_type=file.content_type,
@@ -253,7 +254,7 @@ class DocumentService:
     ) -> list[Document]:
         return await DocumentRepository.get_by_user(
             db=db,
-            user_id=user.id,
+            organization_id=user.organization_id,
         )
 
     @staticmethod
@@ -262,11 +263,18 @@ class DocumentService:
         document_id: int,
         user: User,
     ) -> None:
-        document = await DocumentRepository.get_by_id_and_user(
-            db=db,
-            document_id=document_id,
-            user_id=user.id,
-        )
+        if user.role.name == "admin":
+            document = await DocumentRepository.get_by_id_and_organization(
+                db=db,
+                document_id=document_id,
+                organization_id=user.organization_id,
+            )
+        else:
+            document = await DocumentRepository.get_by_id_and_user(
+                db=db,
+                document_id=document_id,
+                user_id=user.id,
+            )
 
         if document is None:
             raise HTTPException(

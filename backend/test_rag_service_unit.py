@@ -18,7 +18,7 @@ def test_no_retrieval_results_returns_insufficient_evidence():
             response = await RAGService.answer(
                 db=None,
                 question="Who approves leave?",
-                user_id=1,
+                organization_id=1,
             )
 
         assert response.answer == RAGService.INSUFFICIENT_EVIDENCE_MESSAGE
@@ -47,7 +47,7 @@ def test_insufficient_evidence_does_not_call_llm():
             response = await RAGService.answer(
                 db=None,
                 question="Who approves leave?",
-                user_id=1,
+                organization_id=1,
             )
 
         assert response.answer == RAGService.INSUFFICIENT_EVIDENCE_MESSAGE
@@ -81,13 +81,16 @@ def test_sufficient_evidence_generates_answer_and_citations():
             new_callable=AsyncMock,
             return_value="The manager approves leave.",
         ) as generate, patch(
-            "app.services.rag_service.CitationBuilder.build",
+            "app.services.rag_service.AnswerValidationService.validate",
+            return_value=True,
+        ), patch(
+            "app.services.rag_service.CitationBuilder.build_relevant",
             return_value=fake_citations,
         ) as build_citations:
             response = await RAGService.answer(
                 db=None,
                 question="Who approves leave?",
-                user_id=1,
+                organization_id=1,
             )
 
         assert response.answer == "The manager approves leave."
@@ -98,7 +101,11 @@ def test_sufficient_evidence_generates_answer_and_citations():
             question="Who approves leave?",
         )
         generate.assert_awaited_once_with("Generated prompt")
-        build_citations.assert_called_once_with([fake_chunk])
+        build_citations.assert_called_once_with(
+            chunks=[fake_chunk],
+            answer="The manager approves leave.",
+            question="Who approves leave?",
+        )
 
     asyncio.run(run_test())
 

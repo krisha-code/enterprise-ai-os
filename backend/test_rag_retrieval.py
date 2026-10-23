@@ -10,7 +10,7 @@ from app.services.evidence_sufficiency_service import (
 )
 
 
-USER_ID = 1
+ORGANIZATION_ID = 1
 
 # Match the production search call: retrieve and rank up to 20 results.
 RETRIEVAL_LIMIT = 20
@@ -277,7 +277,7 @@ async def evaluate_question(question_data: dict) -> dict:
             await DocumentSearchService.search_with_scores(
                 db=db,
                 query=question,
-                user_id=USER_ID,
+                organization_id=ORGANIZATION_ID,
                 limit=RETRIEVAL_LIMIT,
                 max_distance=None,
             )

@@ -20,7 +20,7 @@ async def main():
         keyword_results = await DocumentChunkRepository.keyword_search(
             db=db,
             query_text=question,
-            user_id=1,
+            organization_id=1,
             limit=10,
         )
 
@@ -50,7 +50,7 @@ async def main():
             await DocumentChunkRepository.similarity_search_with_scores(
                 db=db,
                 query_embedding=query_embedding,
-                user_id=1,
+                organization_id=1,
                 limit=10,
                 max_distance=0.55,
             )

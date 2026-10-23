@@ -37,6 +37,7 @@ class ChatService:
         db: AsyncSession,
         conversation_id: int,
         user_id: int,
+        organization_id: int,
         question: str,
         limit: int = 5,
     ) -> RAGResponse:
@@ -84,7 +85,7 @@ class ChatService:
             await DocumentSearchService.search_with_scores(
                 db=db,
                 query=retrieval_query,
-                user_id=user_id,
+                organization_id=organization_id,
                 limit=limit,
                 max_distance=None,
             )
