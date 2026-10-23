@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from sqlalchemy import select
 
@@ -11,7 +12,11 @@ from app.models.user import User
 async def create_test_user():
 
     email = "document.tester@example.com"
-    password = "DocumentTest123"
+    password = os.environ.get("DEMO_USER_PASSWORD")
+    if not password:
+        raise SystemExit(
+            "Set DEMO_USER_PASSWORD in the environment before creating the demo user."
+        )
     name = "Document Tester"
 
     async with AsyncSessionLocal() as db:
@@ -28,7 +33,6 @@ async def create_test_user():
         if existing_user:
             print("User already exists.")
             print(f"Email: {email}")
-            print(f"Password: {password}")
             print(f"User ID: {existing_user.id}")
             return
 
@@ -61,7 +65,6 @@ async def create_test_user():
 
         print("Test user created successfully.")
         print(f"Email: {email}")
-        print(f"Password: {password}")
         print(f"User ID: {user.id}")
 
 

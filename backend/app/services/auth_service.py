@@ -7,17 +7,12 @@ from app.config.settings import settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
-    create_password_reset_token,
     decode_refresh_token,
     hash_password,
-    hash_password_reset_token,
     hash_refresh_token,
     verify_password,
 )
 from app.models.user import User
-from app.repositories.password_reset_token_repository import (
-    PasswordResetTokenRepository,
-)
 from app.repositories.refresh_token_repository import (
     RefreshTokenRepository,
 )
@@ -291,40 +286,13 @@ class AuthService:
         db: AsyncSession,
         email: str,
     ) -> str:
-
-        user = await UserRepository.get_by_email(
-            db,
-            email,
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Password reset is unavailable until email delivery "
+                "is configured."
+            ),
         )
-
-        # Do not reveal whether the email exists.
-        if user is None:
-            return (
-                "If the email exists, a password reset link "
-                "has been generated."
-            )
-
-        reset_token = create_password_reset_token()
-
-        token_hash = hash_password_reset_token(
-            reset_token,
-        )
-
-        expires_at = (
-            datetime.now(timezone.utc)
-            + timedelta(minutes=15)
-        )
-
-        await PasswordResetTokenRepository.create(
-            db=db,
-            user_id=user.id,
-            token_hash=token_hash,
-            expires_at=expires_at,
-        )
-
-        # Temporary: return token for local testing.
-        # Later this will be sent through email.
-        return reset_token
 
     @staticmethod
     async def reset_password(
@@ -332,61 +300,12 @@ class AuthService:
         token: str,
         new_password: str,
     ) -> None:
-
-        token_hash = hash_password_reset_token(
-            token,
-        )
-
-        stored_token = (
-            await PasswordResetTokenRepository.get_by_token_hash(
-                db,
-                token_hash,
-            )
-        )
-
-        if stored_token is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired reset token",
-            )
-
-        if stored_token.used:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Reset token has already been used",
-            )
-
-        if stored_token.expires_at <= datetime.now(
-            timezone.utc
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired reset token",
-            )
-
-        user = await UserRepository.get_by_id(
-            db,
-            stored_token.user_id,
-        )
-
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-            )
-
-        user.password_hash = hash_password(
-            new_password,
-        )
-
-        stored_token.used = True
-
-        await db.commit()
-
-        # Invalidate existing refresh sessions.
-        await RefreshTokenRepository.revoke_all_for_user(
-            db,
-            user.id,
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Password reset is unavailable until email delivery "
+                "is configured."
+            ),
         )
 
     @staticmethod
