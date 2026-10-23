@@ -49,11 +49,3 @@ print("=" * 50)
 @app.get("/")
 def root():
     return {"message": settings.APP_NAME}
-
-
-
-# {
-#   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzkxMTQ0MjY5LCJ0eXBlIjoiYWNjZXNzIn0.jxRVCdJUuKv4FS5dq_BiVeN_VSYZtwVcH5AH_HLAahQ",
-#   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzkxNzQ3MjY5LCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6ImMyM2QxMmMzLWFlY2UtNGUyNy05ZDQzLTJkODNhNmQwYTI0MCJ9.1gmxS3Tk5Rw1K3_DwUnwj8NDyY8wrSCo_gFX9EhTSoE",
-#   "token_type": "bearer"
-# }
