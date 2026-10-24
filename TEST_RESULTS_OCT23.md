@@ -3,9 +3,9 @@
 ## Automated test suite
 
 - Latest command: `python -m pytest -q --ignore=test_docx_styles.py`
-- Latest run: October 24, 2026, from `backend/` with the project virtual environment and local PostgreSQL running.
-- Latest result: **83 passed in 43.33 seconds**, with one SQLAlchemy deprecation warning (`datetime.datetime.utcnow()` is deprecated).
-- This latest result replaces the earlier October 23 count of 81 passed.
+- Latest run: October 24, 2026, from `backend/` with the project virtual environment and local PostgreSQL running, after replacing deprecated naive UTC timestamp defaults with timezone-aware UTC values.
+- Latest result: **83 passed in 76.97 seconds**, with no warnings.
+- This latest result replaces the earlier October 23 count of 81 passed and the October 24 run that still emitted a deprecation warning.
 - `test_docx_styles.py` was excluded because it is a standalone DOCX inspection script that attempts to open a local document during collection; it is not a normal automated test and the expected local fixture is unavailable in this run.
 - An initial attempt to run `Set-Location .\backend` failed because the terminal was already in `backend/`. This was only a working-directory mistake and did not affect the test result.
 

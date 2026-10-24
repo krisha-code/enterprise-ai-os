@@ -109,7 +109,7 @@ $env:DATABASE_PORT = "5433"
 python -m pytest -q --ignore=test_docx_styles.py
 ```
 
-The Windows host uses port `5433`; containers use the internal port `5432`. The ignored DOCX style test is excluded because of its environment-specific behavior. On October 24, 2026, this checkout's recorded result was **83 passed in 43.33 seconds**, with one SQLAlchemy `datetime.utcnow()` deprecation warning. See `TEST_RESULTS_OCT23.md` for the run record.
+The Windows host uses port `5433`; containers use the internal port `5432`. The ignored DOCX style test is excluded because of its environment-specific behavior. On October 24, 2026, this checkout's latest recorded result was **83 passed in 76.97 seconds**, with no warnings. See `TEST_RESULTS_OCT23.md` for the run record.
 
 ## Current MVP capabilities
 
