@@ -55,6 +55,7 @@ class UserService:
             password_hash,
             user_role.id,
             organization_id,
+            must_change_password=True,
         )
 
     @staticmethod
@@ -184,6 +185,7 @@ class UserService:
             )
 
         user.is_active = False
+        user.token_version += 1
 
         await db.commit()
         await db.refresh(user)

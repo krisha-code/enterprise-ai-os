@@ -28,4 +28,5 @@ async def ask_rag(
         question=request.question,
         organization_id=current_user.organization_id,
         limit=5,
+        document_id=request.document_id,
     )

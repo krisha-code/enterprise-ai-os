@@ -31,4 +31,6 @@ async def chat(
         organization_id=current_user.organization_id,
         question=request.question,
         limit=5,
+        document_id=request.document_id,
+        mode=request.mode,
     )

@@ -58,6 +58,7 @@ async def get_documents(
 async def search_documents(
     query: str,
     limit: int = 5,
+    document_id: int | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -66,6 +67,7 @@ async def search_documents(
         query=query,
         organization_id=current_user.organization_id,
         limit=limit,
+        document_id=document_id,
     )
 
 

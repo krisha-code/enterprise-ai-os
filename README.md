@@ -62,7 +62,32 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 Start-Process http://127.0.0.1:8000/docs
 ```
 
+### Create the first organization administrator
+
+The application does not have public sign-up or an Admin choice on the sign-in page. Create the first administrator from the running backend's private console:
+
+```powershell
+docker compose exec backend python seed_rbac.py
+```
+
+The script prompts for the organization name, admin name, email, and a unique password of at least 16 characters. The password prompt does not echo the password, and the script never prints it. For the existing local demo database, use `Default Organization` as the organization name. Keep this admin password private. The admin can then create regular-user accounts from the Streamlit **Organization admin · Manage users** panel. Each new user must replace their temporary password with a personal password at first sign-in.
+
+The sign-in page intentionally has no role selector: account roles are assigned by the system and cannot be selected by visitors. Regular users can use document Q&A, but only administrators can list or manage organization accounts.
+
 The health endpoint confirms that the API process is responding. The Docs page lets you authenticate and exercise protected endpoints. The backend container reaches Ollama on the Windows host through `host.docker.internal`; keep Ollama running when asking questions.
+
+### Run the Streamlit frontend
+
+Keep the Docker Compose backend and Ollama running. From the repository root, create the frontend environment, install its dependencies, and start Streamlit:
+
+```powershell
+python -m venv .\frontend\.venv
+& .\frontend\.venv\Scripts\Activate.ps1
+python -m pip install -r .\requirements.txt
+python -m streamlit run .\frontend\app.py
+```
+
+Open the local URL printed by Streamlit (usually `http://localhost:8501`). The frontend connects to the local API at `http://127.0.0.1:8000` by default. For a hosted frontend, configure `API_URL` using the hosting platform's secret settings; never commit a real `.streamlit/secrets.toml`.
 
 Useful Compose commands (run inside `backend`):
 
@@ -84,7 +109,7 @@ $env:DATABASE_PORT = "5433"
 python -m pytest -q --ignore=test_docx_styles.py
 ```
 
-The Windows host uses port `5433`; containers use the internal port `5432`. The ignored DOCX style test is excluded because of its environment-specific behavior. On October 23, 2026, the recorded suite result was **83 passed** with one SQLAlchemy datetime deprecation warning. Rerun the suite against your current checkout to confirm its present result.
+The Windows host uses port `5433`; containers use the internal port `5432`. The ignored DOCX style test is excluded because of its environment-specific behavior. On October 24, 2026, this checkout's recorded result was **83 passed in 43.33 seconds**, with one SQLAlchemy `datetime.utcnow()` deprecation warning. See `TEST_RESULTS_OCT23.md` for the run record.
 
 ## Current MVP capabilities
 
@@ -99,6 +124,7 @@ The Windows host uses port `5433`; containers use the internal port `5432`. The 
 - Source citations with document and chunk metadata
 - Conversations and chat history
 - Active-document filtering
+- Streamlit frontend for sign-in, organization-admin user management, document upload, search, document Q&A, passage and whole-document summaries, and saved conversations
 
 ## Current limitations
 
@@ -110,4 +136,4 @@ The Windows host uses port `5433`; containers use the internal port `5432`. The 
 
 ## Project status
 
-The October 22–25 MVP work focuses on document processing, the RAG pipeline, organization security, end-to-end checks, and local release readiness. Features such as agent orchestration, background workers, observability infrastructure, Kubernetes deployment, and a frontend are future work and are not part of this MVP.
+This repository contains a locally runnable end-to-end MVP with a FastAPI backend, Streamlit frontend, PostgreSQL/pgvector storage, and Ollama-based generation. It is suitable for local demonstration and interview discussion, but has not had a production security audit or a public production deployment. Agent orchestration, background workers, production observability, and Kubernetes deployment remain future work.

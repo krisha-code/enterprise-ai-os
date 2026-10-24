@@ -9,6 +9,30 @@ from app.models.document_chunk import DocumentChunk
 class DocumentChunkRepository:
 
     @staticmethod
+    async def get_by_document_for_summary(
+        db: AsyncSession,
+        document_id: int,
+        organization_id: int,
+    ) -> list[DocumentChunk]:
+        result = await db.execute(
+            select(DocumentChunk)
+            .options(selectinload(DocumentChunk.document))
+            .join(
+                Document,
+                Document.id == DocumentChunk.document_id,
+            )
+            .where(
+                DocumentChunk.document_id == document_id,
+                Document.organization_id == organization_id,
+                Document.is_active.is_(True),
+                Document.processing_status == "completed",
+            )
+            .order_by(DocumentChunk.chunk_index)
+        )
+
+        return list(result.scalars().all())
+
+    @staticmethod
     async def create_many(
         db: AsyncSession,
         document_id: int,
@@ -113,6 +137,7 @@ class DocumentChunkRepository:
         organization_id: int,
         limit: int = 5,
         max_distance: float | None = None,
+        document_id: int | None = None,
     ):
 
         distance = DocumentChunk.embedding.cosine_distance(
@@ -144,6 +169,11 @@ class DocumentChunkRepository:
                 distance <= max_distance
             )
 
+        if document_id is not None:
+            query = query.where(
+                Document.id == document_id
+            )
+
         query = (
             query
             .order_by(distance)
@@ -160,6 +190,7 @@ class DocumentChunkRepository:
         query_text: str,
         organization_id: int,
         limit: int = 5,
+        document_id: int | None = None,
     ):
 
         search_text = func.concat(
@@ -186,7 +217,7 @@ class DocumentChunkRepository:
             search_query,
         )
 
-        result = await db.execute(
+        query = (
             select(
                 DocumentChunk,
                 rank.label("rank"),
@@ -204,8 +235,15 @@ class DocumentChunkRepository:
                 Document.processing_status == "completed",
                 search_vector.op("@@")(search_query),
             )
-            .order_by(rank.desc())
-            .limit(limit)
+        )
+
+        if document_id is not None:
+            query = query.where(
+                Document.id == document_id
+            )
+
+        result = await db.execute(
+            query.order_by(rank.desc()).limit(limit)
         )
 
         return result.all()

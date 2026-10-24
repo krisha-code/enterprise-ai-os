@@ -56,9 +56,7 @@ async def get_users(
     sort_by: str = "id",
     order: str = "asc",
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(
-        require_permission("users:read")
-    ),
+    current_user: User = Depends(require_admin),
 ):
     return await UserService.get_users(
         db,
@@ -103,6 +101,11 @@ async def deactivate_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Administrators cannot deactivate their own account here",
+        )
     return await UserService.deactivate_user(
         db,
         user_id,
@@ -195,6 +198,11 @@ async def delete_user(
         require_permission("users:delete")
     ),
 ):
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Administrators cannot delete their own account here",
+        )
     await UserService.delete_user(
         db,
         user_id,

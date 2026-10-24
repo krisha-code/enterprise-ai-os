@@ -5,6 +5,13 @@ from app.services.reranker_service import RerankerService
 
 class DocumentSearchService:
 
+    SUMMARY_TERMS = ("summary", "summarize", "summarise", "overview")
+
+    @staticmethod
+    def is_summary_request(query: str) -> bool:
+        normalized = query.casefold()
+        return any(term in normalized for term in DocumentSearchService.SUMMARY_TERMS)
+
     @staticmethod
     def expand_comparison_query(query: str) -> str:
         comparison_terms = (
@@ -33,11 +40,26 @@ class DocumentSearchService:
         organization_id,
         limit=5,
         max_distance=None,
+        document_id=None,
     ):
+        # A selected-document summary needs broader coverage than a focused
+        # fact question. Keep the increase bounded for the local LLM context.
+        if (
+            document_id is not None
+            and DocumentSearchService.is_summary_request(query)
+        ):
+            limit = max(limit, 8)
+
         candidate_limit = max(limit * 4, 20)
 
         search_query = DocumentSearchService.expand_comparison_query(
             query
+        )
+
+        document_filter = (
+            {"document_id": document_id}
+            if document_id is not None
+            else {}
         )
 
         hybrid_results = await HybridSearchService.search(
@@ -46,6 +68,7 @@ class DocumentSearchService:
             organization_id=organization_id,
             limit=candidate_limit,
             max_distance=max_distance,
+            **document_filter,
         )
 
         if not hybrid_results:
@@ -68,6 +91,7 @@ class DocumentSearchService:
         organization_id,
         limit=5,
         max_distance=None,
+        document_id=None,
     ):
         reranked_results = (
             await DocumentSearchService.search_with_scores(
@@ -76,6 +100,11 @@ class DocumentSearchService:
                 organization_id=organization_id,
                 limit=limit,
                 max_distance=max_distance,
+                **(
+                    {"document_id": document_id}
+                    if document_id is not None
+                    else {}
+                ),
             )
         )
 

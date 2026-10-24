@@ -57,6 +57,7 @@ class AuthService:
 
         token_data = {
             "sub": str(user.id),
+            "ver": user.token_version,
         }
 
         access_token = create_access_token(
@@ -166,6 +167,12 @@ class AuthService:
                 detail="User not found",
             )
 
+        if payload.get("ver", 0) != user.token_version:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been revoked",
+            )
+
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -179,6 +186,7 @@ class AuthService:
 
         token_data = {
             "sub": str(user.id),
+            "ver": user.token_version,
         }
 
         new_access_token = create_access_token(
@@ -273,6 +281,8 @@ class AuthService:
         user.password_hash = hash_password(
             new_password,
         )
+        user.must_change_password = False
+        user.token_version += 1
 
         await db.commit()
 

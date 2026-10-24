@@ -21,7 +21,8 @@ class HybridSearchService:
         query: str,
         organization_id: int,
         limit: int = 20,
-        max_distance: float | None =None,
+        max_distance: float | None = None,
+        document_id: int | None = None,
     ):
         # ----------------------------------------
         # Generate query embedding
@@ -35,6 +36,12 @@ class HybridSearchService:
         # Vector retrieval
         # ----------------------------------------
 
+        document_filter = (
+            {"document_id": document_id}
+            if document_id is not None
+            else {}
+        )
+
         vector_results = (
             await DocumentChunkRepository.similarity_search_with_scores(
                 db=db,
@@ -42,6 +49,7 @@ class HybridSearchService:
                 organization_id=organization_id,
                 limit=limit,
                 max_distance=max_distance,
+                **document_filter,
             )
         )
 
@@ -55,6 +63,7 @@ class HybridSearchService:
                 query_text=query,
                 organization_id=organization_id,
                 limit=limit,
+                **document_filter,
             )
         )
 

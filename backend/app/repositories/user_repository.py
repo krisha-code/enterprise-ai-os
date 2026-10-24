@@ -15,6 +15,7 @@ class UserRepository:
         password_hash: str,
         role_id: int,
         organization_id: int,
+        must_change_password: bool = False,
     ) -> User:
         user = User(
             name=user_data.name,
@@ -22,13 +23,16 @@ class UserRepository:
             password_hash=password_hash,
             role_id=role_id,
             organization_id=organization_id,
+            must_change_password=must_change_password,
         )
 
         db.add(user)
         await db.commit()
-        await db.refresh(user)
-
-        return user
+        return await UserRepository.get_by_id(
+            db,
+            user.id,
+            organization_id,
+        )
 
     @staticmethod
     async def get_by_email(

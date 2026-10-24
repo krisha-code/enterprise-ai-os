@@ -14,6 +14,7 @@ venv/
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
 
 # IDE
 .vscode/
@@ -52,3 +53,18 @@ uploads/
 backend/evaluation_latest.txt
 backend/retrieval_eval_*.txt
 backend/retrieval_scores*.txt
+
+# Local scratch files and backups (keep out of source control)
+backend/app/services/document_service.py.bak*
+backend/chat_service_diff.txt
+backend/check_test_account.py
+backend/debug_q7*.py
+backend/docker-compose.yml.bak
+backend/hybrid_test_diff.txt
+backend/inspect_chunk.py
+backend/integration_test_document.txt
+backend/integration_test_invalid.xyz
+backend/rag_test_diff.txt
+backend/rag_test_log.txt
+backend/repository_diff.txt
+backend/test_document_deletion.py.bak

@@ -5,6 +5,7 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.database.session import get_db
 from app.schemas.auth import (
+    CurrentUserResponse,
     LogoutRequest,
     PasswordChangeRequest,
     RefreshTokenRequest,
@@ -22,6 +23,20 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+
+@router.get("/me", response_model=CurrentUserResponse)
+async def get_my_account(
+    current_user: User = Depends(get_current_user),
+):
+    return CurrentUserResponse(
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        organization_id=current_user.organization_id,
+        role=current_user.role.name,
+        must_change_password=current_user.must_change_password,
+    )
 
 
 @router.post(

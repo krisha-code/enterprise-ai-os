@@ -10,6 +10,8 @@ from app.repositories.conversation_repository import (
 from app.repositories.message_repository import (
     MessageRepository,
 )
+from app.repositories.document_repository import DocumentRepository
+from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.services.conversation_history_service import (
     ConversationHistoryService,
 )
@@ -25,6 +27,7 @@ from app.services.citation_builder import CitationBuilder
 from app.services.answer_validation_service import (
     AnswerValidationService,
 )
+from app.services.document_summary_service import DocumentSummaryService
 from app.schemas.rag import RAGResponse
 
 logger = logging.getLogger("enterprise-ai-os")
@@ -40,6 +43,8 @@ class ChatService:
         organization_id: int,
         question: str,
         limit: int = 5,
+        document_id: int | None = None,
+        mode: str = "answer",
     ) -> RAGResponse:
 
         # 1. Verify conversation ownership.
@@ -74,6 +79,68 @@ class ChatService:
             content=question,
         )
 
+        # A summary of a selected document must cover its full extracted text;
+        # normal questions continue through retrieval and evidence checks.
+        if document_id is not None and mode == "document_summary":
+            document = await DocumentRepository.get_by_id_and_organization(
+                db=db,
+                document_id=document_id,
+                organization_id=organization_id,
+            )
+
+            if document is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Document not found",
+                )
+
+            if (
+                document.processing_status != "completed"
+                or not document.extracted_text
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Document has no extracted text to summarize",
+                )
+
+            try:
+                answer = await DocumentSummaryService.summarize(
+                    text=document.extracted_text,
+                    filename=document.filename,
+                )
+            except (httpx.HTTPError, KeyError, ValueError):
+                logger.exception(
+                    "Document summary failed for document_id=%s",
+                    document_id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "The summary service is temporarily unavailable. "
+                        "Please try again."
+                    ),
+                ) from None
+
+            chunks = await DocumentChunkRepository.get_by_document_for_summary(
+                db=db,
+                document_id=document_id,
+                organization_id=organization_id,
+            )
+            citations = CitationBuilder.build_relevant(
+                chunks=chunks,
+                answer=answer,
+                min_overlap_ratio=0.05,
+            )
+
+            await MessageRepository.create_message(
+                db=db,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=answer,
+            )
+
+            return RAGResponse(answer=answer, citations=citations)
+
         # 4. Rewrite the question for retrieval.
         retrieval_query = QueryRewriteService.rewrite(
             question=question,
@@ -81,6 +148,12 @@ class ChatService:
         )
 
         # 5. Retrieve and rerank evidence.
+        document_filter = (
+            {"document_id": document_id}
+            if document_id is not None
+            else {}
+        )
+
         reranked_results = (
             await DocumentSearchService.search_with_scores(
                 db=db,
@@ -88,6 +161,7 @@ class ChatService:
                 organization_id=organization_id,
                 limit=limit,
                 max_distance=None,
+                **document_filter,
             )
         )
 
@@ -119,9 +193,19 @@ class ChatService:
         context = ContextBuilder.build(chunks)
 
         # 8. Build the prompt.
+        prompt_question = question
+        if mode == "passage_summary":
+            prompt_question = (
+                "Summarize the retrieved passages as one coherent, concise "
+                "overview focused on this request. Synthesize related points "
+                "instead of describing chunks one by one. Use only the "
+                "retrieved evidence and preserve its meaning. User's focus: "
+                f"{question}"
+            )
+
         prompt = PromptBuilder.build(
             context=context,
-            question=question,
+            question=prompt_question,
             conversation_history=conversation_history,
         )
 

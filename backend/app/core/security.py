@@ -49,6 +49,7 @@ def create_access_token(
     to_encode.update(
         {
             "exp": expire,
+            "iat": int(datetime.now(timezone.utc).timestamp()),
             "type": "access",
         }
     )
@@ -75,6 +76,7 @@ def create_refresh_token(
     to_encode.update(
         {
             "exp": expire,
+            "iat": int(datetime.now(timezone.utc).timestamp()),
             "type": "refresh",
             "jti": str(uuid4()),
         }

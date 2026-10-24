@@ -1,158 +1,86 @@
+"""Create the first organization administrator from private environment values.
+
+Run after database migrations from the backend directory. This script never
+prints or stores the administrator's password in source control.
+"""
 import asyncio
+import getpass
+import os
 
 from sqlalchemy import select
 
 from app.core.security import hash_password
+from app.database.seed_rbac import seed_rbac
 from app.database.session import AsyncSessionLocal
-from app.models.permission import Permission
+from app.models.organization import Organization
 from app.models.role import Role
-from app.models.role_permission import RolePermission
 from app.models.user import User
 
 
-PERMISSIONS = [
-    "users:read",
-    "users:create",
-    "users:update",
-    "users:delete",
-]
+async def main() -> None:
+    email = os.getenv("BOOTSTRAP_ADMIN_EMAIL") or input("Organization admin email: ")
+    email = email.strip().lower()
+    password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD") or getpass.getpass(
+        "Create a unique admin password (at least 16 characters): "
+    )
+    organization_name = (
+        os.getenv("BOOTSTRAP_ORGANIZATION_NAME")
+        or input("Organization name: ")
+    ).strip()
+    admin_name = os.getenv("BOOTSTRAP_ADMIN_NAME") or input("Admin name: ")
+    admin_name = admin_name.strip() or "Organization Admin"
 
+    if not email or "@" not in email:
+        raise SystemExit("Set BOOTSTRAP_ADMIN_EMAIL to the admin's email address.")
+    if len(password) < 16:
+        raise SystemExit("Set BOOTSTRAP_ADMIN_PASSWORD to a unique password of at least 16 characters.")
+    if not organization_name:
+        raise SystemExit("Set BOOTSTRAP_ORGANIZATION_NAME to the organization name.")
 
-async def main():
+    await seed_rbac()
+
     async with AsyncSessionLocal() as db:
-
-        # ----------------------------------------
-        # 1. Create permissions
-        # ----------------------------------------
-
-        permissions = {}
-
-        for permission_name in PERMISSIONS:
-            result = await db.execute(
-                select(Permission).where(
-                    Permission.name == permission_name
-                )
-            )
-
-            permission = result.scalar_one_or_none()
-
-            if not permission:
-                permission = Permission(
-                    name=permission_name
-                )
-                db.add(permission)
-                await db.flush()
-
-            permissions[permission_name] = permission
-
-        # ----------------------------------------
-        # 2. Create roles
-        # ----------------------------------------
-
-        result = await db.execute(
-            select(Role).where(Role.name == "admin")
+        organization_result = await db.execute(
+            select(Organization).where(Organization.name == organization_name)
         )
-
-        admin_role = result.scalar_one_or_none()
-
-        if not admin_role:
-            admin_role = Role(name="admin")
-            db.add(admin_role)
+        organization = organization_result.scalar_one_or_none()
+        if organization is None:
+            organization = Organization(name=organization_name)
+            db.add(organization)
             await db.flush()
 
-        result = await db.execute(
-            select(Role).where(Role.name == "user")
-        )
+        role_result = await db.execute(select(Role).where(Role.name == "admin"))
+        admin_role = role_result.scalar_one()
 
-        user_role = result.scalar_one_or_none()
-
-        if not user_role:
-            user_role = Role(name="user")
-            db.add(user_role)
-            await db.flush()
-
-        # ----------------------------------------
-        # 3. Give admin all permissions
-        # ----------------------------------------
-
-        for permission in permissions.values():
-
-            result = await db.execute(
-                select(RolePermission).where(
-                    RolePermission.role_id == admin_role.id,
-                    RolePermission.permission_id == permission.id,
+        user_result = await db.execute(select(User).where(User.email == email))
+        existing_user = user_result.scalar_one_or_none()
+        if existing_user is not None:
+            if (
+                existing_user.role_id != admin_role.id
+                or existing_user.organization_id != organization.id
+            ):
+                raise SystemExit(
+                    "That email already belongs to a different account. "
+                    "Use a new admin email; this script will not promote or move accounts."
                 )
-            )
+            print(f"Organization admin already exists: {email} ({organization_name}).")
+            return
 
-            role_permission = result.scalar_one_or_none()
-
-            if not role_permission:
-                db.add(
-                    RolePermission(
-                        role_id=admin_role.id,
-                        permission_id=permission.id,
-                    )
-                )
-
-        # ----------------------------------------
-        # 4. Give normal users read permission
-        # ----------------------------------------
-
-        result = await db.execute(
-            select(RolePermission).where(
-                RolePermission.role_id == user_role.id,
-                RolePermission.permission_id
-                == permissions["users:read"].id,
-            )
-        )
-
-        user_read_permission = result.scalar_one_or_none()
-
-        if not user_read_permission:
-            db.add(
-                RolePermission(
-                    role_id=user_role.id,
-                    permission_id=permissions["users:read"].id,
-                )
-            )
-
-        # ----------------------------------------
-        # 5. Create first admin user
-        # ----------------------------------------
-
-        admin_email = "admin@example.com"
-
-        result = await db.execute(
-            select(User).where(
-                User.email == admin_email
-            )
-        )
-
-        admin_user = result.scalar_one_or_none()
-
-        if not admin_user:
-            admin_user = User(
-                name="Admin",
-                email=admin_email,
-                password_hash=hash_password("Admin123"),
+        db.add(
+            User(
+                name=admin_name or "Organization Admin",
+                email=email,
+                password_hash=hash_password(password),
                 is_active=True,
                 role_id=admin_role.id,
+                organization_id=organization.id,
+                must_change_password=False,
             )
-
-            db.add(admin_user)
-
+        )
         await db.commit()
 
-        print()
-        print("RBAC seed completed successfully.")
-        print()
-        print("Admin login:")
-        print("Email: admin@example.com")
-        print("Password: Admin123")
-        print()
-        print("Permissions:")
-        for permission_name in PERMISSIONS:
-            print(f"- {permission_name}")
+    print(f"Organization admin created: {email} ({organization_name}).")
+    print("Keep the password private. The password itself was not printed.")
 
 
 if __name__ == "__main__":

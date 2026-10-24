@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AliasPath, BaseModel, EmailStr, Field
 
 
 class UserCreate(BaseModel):
@@ -21,6 +21,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     is_active: bool
     role_id: int
+    role_name: str = Field(validation_alias=AliasPath("role", "name"))
+    must_change_password: bool = False
     model_config = {
         "from_attributes": True,
     }

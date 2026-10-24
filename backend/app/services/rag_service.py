@@ -23,11 +23,18 @@ class RAGService:
         question: str,
         organization_id: int,
         limit: int = 5,
+        document_id: int | None = None,
     ) -> RAGResponse:
 
         # --------------------------------------------------
         # Step 1: Retrieve and rerank evidence
         # --------------------------------------------------
+
+        document_filter = (
+            {"document_id": document_id}
+            if document_id is not None
+            else {}
+        )
 
         reranked_results = (
             await DocumentSearchService.search_with_scores(
@@ -36,6 +43,7 @@ class RAGService:
                 organization_id=organization_id,
                 limit=limit,
                 max_distance=None,
+                **document_filter,
             )
         )
 
